@@ -1,50 +1,57 @@
 name: Build for OneThing Cloud (ARMv7)
 
 on:
-  workflow_dispatch: # 允许手动点击按钮触发编译
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest # 使用 GitHub 最新的 Ubuntu 服务器
+    runs-on: ubuntu-latest
 
     steps:
       # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 设置 Go 环境
+      # 2. 设置 Node.js 环境 (用于构建前端)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # 使用 Node 18 构建前端
+
+      # 3. 设置 Go 环境
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # 使用 Go 1.21 版本
+          go-version: '1.21'
 
-      # 3. 交叉编译 (关键步骤)
-      - name: Build for ARMv7
+      # 4. 构建前端 AND 后端
+      - name: Build Frontend & Backend
         run: |
-          # 1. 强制清理并重新下载所有依赖（包括前端资源）
-          rm -rf go.sum
-          go mod download
-          go mod tidy
-          
-          # 2. 设置交叉编译环境变量
-          # 设置环境变量，告诉 Go 编译器目标是 ARMv7
+          # --- 第一步：构建前端 ---
+          echo "🔨 Building Frontend..."
+          cd web/default  # 进入前端源码目录 (One API 的前端通常在 web/default)
+          npm install     # 安装前端依赖
+          npm run build   # 编译生成静态文件 (生成 build 目录)
+          cd ../..        # 返回根目录
+
+          # --- 第二步：构建后端 ---
+          echo "🔨 Building Backend for ARMv7..."
           export GOOS=linux
           export GOARCH=arm
-          export GOARM=6  # 玩客云 S805 芯片使用 GOARM=6 兼容性最好
-          export CGO_ENABLED=1 # 开启 CGO 以支持 SQLite
+          export GOARM=6
+          export CGO_ENABLED=1
           
-          # 安装 GCC 交叉编译器 (Ubuntu 镜像通常自带，如果没有需安装 gcc-arm-linux-gnueabihf)
+          # 安装 C 编译器
           sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabihf
           
-          # 执行编译
+          # 编译 (此时 Go 会检测到 web/default/build 目录已存在，并将其打包)
           go build -ldflags "-s -w" -o one-api-armv7
         env:
-          # 指定使用交叉编译器
           CC: arm-linux-gnueabihf-gcc
 
-      # 4. 上传编译结果
+      # 5. 上传结果
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: one-api-armv7-binary
+          name: one-api-armv7-full
           path: one-api-armv7
