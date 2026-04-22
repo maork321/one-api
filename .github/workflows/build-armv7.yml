@@ -1,0 +1,44 @@
+name: Build for OneThing Cloud (ARMv7)
+
+on:
+  workflow_dispatch: # 允许手动点击按钮触发编译
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # 使用 GitHub 最新的 Ubuntu 服务器
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 设置 Go 环境
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21' # 使用 Go 1.21 版本
+
+      # 3. 交叉编译 (关键步骤)
+      - name: Build for ARMv7
+        run: |
+          # 设置环境变量，告诉 Go 编译器目标是 ARMv7
+          export GOOS=linux
+          export GOARCH=arm
+          export GOARM=6  # 玩客云 S805 芯片使用 GOARM=6 兼容性最好
+          export CGO_ENABLED=1 # 开启 CGO 以支持 SQLite
+          
+          # 安装 GCC 交叉编译器 (Ubuntu 镜像通常自带，如果没有需安装 gcc-arm-linux-gnueabihf)
+          sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabihf
+          
+          # 执行编译
+          go build -ldflags "-s -w" -o one-api-armv7
+        env:
+          # 指定使用交叉编译器
+          CC: arm-linux-gnueabihf-gcc
+
+      # 4. 上传编译结果
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: one-api-armv7-binary
+          path: one-api-armv7
