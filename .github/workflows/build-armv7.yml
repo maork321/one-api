@@ -21,7 +21,9 @@ jobs:
       # 3. 交叉编译 (关键步骤)
       - name: Build for ARMv7
         run: |
-          # 1. 清理并下载依赖（确保前端资源也被拉取）
+          # 1. 强制清理并重新下载所有依赖（包括前端资源）
+          rm -rf go.sum
+          go mod download
           go mod tidy
           
           # 2. 设置交叉编译环境变量
